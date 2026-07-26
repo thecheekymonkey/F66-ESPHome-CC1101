@@ -5,7 +5,8 @@ An ESPHome-based replacement for the **F66 433 MHz ceiling-fan remote** (FCC ID 
 The production firmware reproduces the original handset by transmitting **literal, hardware-verified RF captures**. All 15 remote functions have been tested successfully against the original fan receiver.
 
 
-> **Release status:** Version 4.0.0 is confirmed working on the original test installation.
+> **Release status:** Version 4.5.0 is confirmed working with active state tracking and Home Assistant UI tile grid polish.
+
 
 ## Supported controls
 

@@ -61,6 +61,91 @@ With the intended fan powered, test in this order:
 
 Keep the verified defaults during this test.
 
+## Recommended Home Assistant Dashboard Card (Native Tile Grid)
+
+Add this YAML snippet to your Home Assistant Dashboard to create a 3-column remote control tile card matching the physical handset:
+
+```yaml
+type: vertical-stack
+title: F66 Ceiling Fan Controller
+cards:
+  - type: entity
+    entity: text_sensor.active_fan_state
+    name: Current Status
+    icon: mdi:fan-clock
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: button.power
+        name: Power
+        icon: mdi:power
+      - type: tile
+        entity: button.fan
+        name: Fan
+        icon: mdi:fan
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: button.speed_1
+        name: Speed 1
+      - type: tile
+        entity: button.speed_2
+        name: Speed 2
+      - type: tile
+        entity: button.speed_3
+        name: Speed 3
+      - type: tile
+        entity: button.speed_4
+        name: Speed 4
+      - type: tile
+        entity: button.speed_5
+        name: Speed 5
+      - type: tile
+        entity: button.speed_6
+        name: Speed 6
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: button.r_l
+        name: Reverse (F/R)
+        icon: mdi:rotate-3d-variant
+      - type: tile
+        entity: button.light_on
+        name: Light On
+        icon: mdi:lightbulb-on
+      - type: tile
+        entity: button.light_off
+        name: Light Off
+        icon: mdi:lightbulb-off
+
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      - type: tile
+        entity: button.1h
+        name: 1H Timer
+      - type: tile
+        entity: button.2h
+        name: 2H Timer
+      - type: tile
+        entity: button.4h
+        name: 4H Timer
+      - type: tile
+        entity: button.8h
+        name: 8H Timer
+```
+
+
 ## Failure checks
 
 If no controls work:

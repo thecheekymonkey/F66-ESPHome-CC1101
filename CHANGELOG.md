@@ -2,7 +2,21 @@
 
 All notable project changes are documented here.
 
+## [4.5.0] - 2026-07-26
+
+### Added
+
+- Active Fan State tracking model and summary text sensor (`text_sensor.active_fan_state`)
+- Custom Material Design icons (`mdi:`) for all 15 primary remote controls
+- Stock Home Assistant Native Tile Grid dashboard card YAML configuration
+- Entity categorization (`config` and `diagnostic`) for clean Home Assistant device presentation
+
+### Changed
+
+- Updated version banner to 4.5.0
+
 ## [4.0.0] - 2026-07-26
+
 
 ### Added
 

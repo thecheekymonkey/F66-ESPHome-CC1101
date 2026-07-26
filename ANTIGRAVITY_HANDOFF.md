@@ -9,7 +9,7 @@ This folder is ready to be published as a new GitHub repository.
 - Hardware: ESP32-S3 DevKitC-1 N16R8 plus CC1101
 
 - Production firmware: `firmware/F66-production-v4.yaml`
-- Version: 4.0.0
+- Version: 4.5.0
 - Status: every exposed control tested successfully
 - Firmware SHA-256: `ef5f8cb16de8fbe65880108bb56e23ac9aa63a31ef7f5afe36b04988c73dcab0`
 - Licence selected: MIT
@@ -22,7 +22,7 @@ This folder is ready to be published as a new GitHub repository.
 2. Do not regenerate the waveforms from the documented command values.
 3. Do not claim multi-fan compatibility.
 4. Do not claim that the final framing bit algorithm is understood.
-5. Do not add BME680 code to the 4.0.0 release.
+5. Do not add BME680 code to the 4.5.0 release.
 6. Do not expose Wi-Fi credentials or a real `secrets.yaml`.
 
 ## Suggested repository name
@@ -38,28 +38,29 @@ This folder is ready to be published as a new GitHub repository.
 1. Create a public GitHub repository named `F66-ESPHome-CC1101`.
 2. Upload the complete contents of this directory, preserving paths.
 3. Use `main` as the default branch.
-4. Make the initial commit:
+4. Make the commit:
 
    ```text
-   Release verified F66 ESPHome controller v4.0.0
+   Release verified F66 ESPHome controller v4.5.0
    ```
 
 5. Confirm GitHub renders the root README correctly.
 6. Create a release tag:
 
    ```text
-   v4.0.0
+   v4.5.0
    ```
 
 7. Create a GitHub release titled:
 
    ```text
-   F66 Ceiling Fan Controller v4.0.0
+   F66 Ceiling Fan Controller v4.5.0
    ```
 
-8. Use the contents of `RELEASE_NOTES_v4.0.0.md` as the release description.
+8. Use the contents of `RELEASE_NOTES_v4.5.0.md` as the release description.
 9. Attach `firmware/F66-production-v4.yaml` to the release.
 10. Do not publish any local `secrets.yaml`, build directory, or ESPHome credentials.
+
 
 ## Included optional assets
 

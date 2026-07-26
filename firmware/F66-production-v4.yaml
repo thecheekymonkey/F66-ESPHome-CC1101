@@ -2,7 +2,7 @@
 #
 # F66 Ceiling Fan Controller
 #
-# Version : 4.0.0 (Production)
+# Version : 4.5.0 (Production)
 #
 # Platform : ESP32-S3 DevKitC-1 + CC1101
 #
@@ -112,10 +112,7 @@ remote_receiver:
 # Reserved pins:
 #   GPIO4  SDA
 #   GPIO5  SCL
-#
-# (No I²C bus is enabled in V4 to preserve the verified firmware.)
 # ---------------------------------------------------------------------------
-
 
 globals:
   - id: frequency_hz
@@ -138,25 +135,61 @@ globals:
     restore_value: no
     initial_value: "1000"
 
+  # Live state tracking model globals
+  - id: state_power
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+  - id: state_speed
+    type: int
+    restore_value: yes
+    initial_value: "1"
+
+  - id: state_dir_forward
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+  - id: state_timer_hours
+    type: int
+    restore_value: yes
+    initial_value: "0"
+
+  - id: state_light
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
 text_sensor:
+  - platform: template
+    name: "Active Fan State"
+    id: active_fan_state
+    icon: "mdi:fan-clock"
+
   - platform: template
     name: "RF Status"
     id: rf_status
     icon: "mdi:radio-tower"
+    entity_category: diagnostic
 
   - platform: template
     name: "RF Transmission Profile"
     id: rf_profile
     icon: "mdi:tune-variant"
+    entity_category: diagnostic
 
 binary_sensor:
   - platform: status
     name: "Controller Status"
+    entity_category: diagnostic
 
 select:
   - platform: template
     name: "RF Frequency"
     id: frequency_select
+    icon: "mdi:sine-wave"
+    entity_category: config
     optimistic: true
     restore_value: false
     initial_option: "433.920 MHz"
@@ -173,6 +206,8 @@ select:
   - platform: template
     name: "RF CC1101 Symbol Rate"
     id: symbol_rate_select
+    icon: "mdi:speedometer"
+    entity_category: config
     optimistic: true
     restore_value: false
     initial_option: "2400 baud"
@@ -191,6 +226,8 @@ select:
   - platform: template
     name: "RF Repeat Count"
     id: repeats_select
+    icon: "mdi:repeat"
+    entity_category: config
     optimistic: true
     restore_value: false
     initial_option: "4"
@@ -204,6 +241,8 @@ select:
   - platform: template
     name: "RF TX Settling"
     id: settle_select
+    icon: "mdi:timer-sand"
+    entity_category: config
     optimistic: true
     restore_value: false
     initial_option: "1000 us"
@@ -219,7 +258,23 @@ select:
           else if (x == "2000 us") id(tx_settle_us) = 2000;
           else id(tx_settle_us) = 1000;
 
+
 script:
+  - id: update_state_summary
+    mode: restart
+    then:
+      - text_sensor.template.publish:
+          id: active_fan_state
+          state: !lambda |-
+            char summary[120];
+            const char* pwr = id(state_power) ? "ON" : "OFF";
+            const char* dir = id(state_dir_forward) ? "Forward" : "Reverse";
+            const char* lgt = id(state_light) ? "ON" : "OFF";
+            std::string tmr = (id(state_timer_hours) > 0) ? (std::to_string(id(state_timer_hours)) + "H") : "None";
+            snprintf(summary, sizeof(summary), "%s | Speed %d | %s | Timer: %s | Light: %s",
+              pwr, id(state_speed), dir, tmr.c_str(), lgt);
+            return std::string(summary);
+
   - id: restore_recommended
     mode: restart
     then:
@@ -448,6 +503,9 @@ button:
     name: "Power"
     icon: "mdi:power"
     on_press:
+      - lambda: |-
+          id(state_power) = !id(state_power);
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 0
@@ -457,6 +515,9 @@ button:
     name: "Fan"
     icon: "mdi:fan"
     on_press:
+      - lambda: |-
+          id(state_power) = !id(state_power);
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 1
@@ -464,8 +525,12 @@ button:
 
   - platform: template
     name: "Speed 1"
-    icon: "mdi:fan-speed-1"
+    icon: "mdi:numeric-1-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 1;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 2
@@ -473,8 +538,12 @@ button:
 
   - platform: template
     name: "Speed 2"
-    icon: "mdi:fan-speed-2"
+    icon: "mdi:numeric-2-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 2;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 3
@@ -482,8 +551,12 @@ button:
 
   - platform: template
     name: "Speed 3"
-    icon: "mdi:fan-speed-3"
+    icon: "mdi:numeric-3-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 3;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 4
@@ -491,7 +564,12 @@ button:
 
   - platform: template
     name: "Speed 4"
+    icon: "mdi:numeric-4-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 4;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 5
@@ -499,7 +577,12 @@ button:
 
   - platform: template
     name: "Speed 5"
+    icon: "mdi:numeric-5-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 5;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 6
@@ -507,7 +590,12 @@ button:
 
   - platform: template
     name: "Speed 6"
+    icon: "mdi:numeric-6-circle"
     on_press:
+      - lambda: |-
+          id(state_power) = true;
+          id(state_speed) = 6;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 7
@@ -515,8 +603,11 @@ button:
 
   - platform: template
     name: "R/L"
-    icon: "mdi:swap-horizontal"
+    icon: "mdi:rotate-3d-variant"
     on_press:
+      - lambda: |-
+          id(state_dir_forward) = !id(state_dir_forward);
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 8
@@ -524,7 +615,11 @@ button:
 
   - platform: template
     name: "1H"
+    icon: "mdi:timer-1"
     on_press:
+      - lambda: |-
+          id(state_timer_hours) = 1;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 9
@@ -532,7 +627,11 @@ button:
 
   - platform: template
     name: "2H"
+    icon: "mdi:timer-2"
     on_press:
+      - lambda: |-
+          id(state_timer_hours) = 2;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 10
@@ -540,7 +639,11 @@ button:
 
   - platform: template
     name: "4H"
+    icon: "mdi:timer-4"
     on_press:
+      - lambda: |-
+          id(state_timer_hours) = 4;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 11
@@ -548,7 +651,11 @@ button:
 
   - platform: template
     name: "8H"
+    icon: "mdi:timer-8"
     on_press:
+      - lambda: |-
+          id(state_timer_hours) = 8;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 12
@@ -558,6 +665,9 @@ button:
     name: "Light On"
     icon: "mdi:lightbulb-on"
     on_press:
+      - lambda: |-
+          id(state_light) = true;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 13
@@ -567,6 +677,9 @@ button:
     name: "Light Off"
     icon: "mdi:lightbulb-off"
     on_press:
+      - lambda: |-
+          id(state_light) = false;
+      - script.execute: update_state_summary
       - script.execute:
           id: send_literal
           frame_id: 14
@@ -574,3 +687,5 @@ button:
 
   - platform: restart
     name: "Restart Ceiling Fan Controller"
+    icon: "mdi:restart"
+    entity_category: config
