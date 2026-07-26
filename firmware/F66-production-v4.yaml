@@ -104,15 +104,30 @@ remote_receiver:
   filter_symbols: 20
 
 # ---------------------------------------------------------------------------
-# Reserved I²C Expansion
-#
-# Planned future sensor:
-#   - BME680 environmental sensor
-#
-# Reserved pins:
-#   GPIO4  SDA
-#   GPIO5  SCL
+# I²C Environmental Sensor (BME680)
 # ---------------------------------------------------------------------------
+
+i2c:
+  sda: GPIO4
+  scl: GPIO5
+  scan: true
+
+sensor:
+  - platform: bme680
+    temperature:
+      name: "Temperature"
+      oversampling: 16x
+    humidity:
+      name: "Humidity"
+      oversampling: 16x
+    pressure:
+      name: "Pressure"
+      oversampling: 16x
+    gas_resistance:
+      name: "Gas Resistance"
+    address: 0x76
+    update_interval: 60s
+
 
 globals:
   - id: frequency_hz
