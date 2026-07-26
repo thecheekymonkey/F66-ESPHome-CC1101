@@ -27,6 +27,7 @@ esphome:
           id: radio
       - cc1101.begin_rx:
           id: radio
+      - script.execute: update_state_summary
       - text_sensor.template.publish:
           id: rf_status
           state: "READY - literal captured frames"
@@ -125,8 +126,9 @@ sensor:
       oversampling: 16x
     gas_resistance:
       name: "Gas Resistance"
-    address: 0x76
-    update_interval: 60s
+    address: 0x77
+    update_interval: 15s
+
 
 
 globals:
