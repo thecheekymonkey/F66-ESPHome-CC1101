@@ -1,0 +1,9 @@
+{
+  "release": "4.0.0",
+  "firmware": "firmware/F66-production-v4.yaml",
+  "sha256": "ef5f8cb16de8fbe65880108bb56e23ac9aa63a31ef7f5afe36b04988c73dcab0",
+  "verified": true,
+  "verified_controls": 15,
+  "bme680_enabled": false,
+  "multi_fan_addressing_known": false
+}
