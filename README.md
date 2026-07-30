@@ -34,6 +34,7 @@ This is the current known-good release. RF behavior is unchanged from the hardwa
 
 - `docs/PROTOCOL.md` — canonical RF specification
 - `docs/COMMANDS.md` — verified command table and frames
+- `docs/F66_COMMAND_DISCOVERY_RESULTS.md` — 9-bit command sweep test results
 - `docs/HARDWARE.md` — hardware and pin assignments
 - `docs/ARCHITECTURE.md` — design decisions and limitations
 - `docs/TESTING.md` — software and hardware tests
@@ -41,6 +42,13 @@ This is the current known-good release. RF behavior is unchanged from the hardwa
 - `docs/NAMING_CONVENTIONS.md` — canonical project, file, version and entity naming
 - `AGENTS.md` — rules for AI coding agents and contributors
 - `MIGRATION_INSTRUCTIONS.md` — safe process for updating an existing GitHub repository
+
+## Protocol status & command discovery
+
+Brute-force command discovery for normal operation is complete. The full 9-bit command space (values 0 through 511) was systematically tested against the F66 receiver. Only the 15 known commands responded; the remaining 497 values produced no observable response during normal operation.
+
+The 15-command table is therefore considered complete for normal operation. While this sweep does not rule out potential factory, pairing, sequence-based, or alternate-prefix behaviors, it confirms that no additional single-command normal-operation functions exist in the 9-bit command field. For full test setup, method, and results, see [`docs/F66_COMMAND_DISCOVERY_RESULTS.md`](docs/F66_COMMAND_DISCOVERY_RESULTS.md).
+
 
 ## Important limitation
 
