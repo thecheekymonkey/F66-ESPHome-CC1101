@@ -35,6 +35,7 @@ This is the current known-good release. RF behavior is unchanged from the hardwa
 - `docs/PROTOCOL.md` — canonical RF specification
 - `docs/COMMANDS.md` — verified command table and frames
 - `docs/F66_COMMAND_DISCOVERY_RESULTS.md` — 9-bit command sweep test results
+- `docs/F66_REVERSE_ENGINEERING_TIMELINE.md` — reverse engineering timeline
 - `docs/HARDWARE.md` — hardware and pin assignments
 - `docs/ARCHITECTURE.md` — design decisions and limitations
 - `docs/TESTING.md` — software and hardware tests
@@ -42,6 +43,7 @@ This is the current known-good release. RF behavior is unchanged from the hardwa
 - `docs/NAMING_CONVENTIONS.md` — canonical project, file, version and entity naming
 - `AGENTS.md` — rules for AI coding agents and contributors
 - `MIGRATION_INSTRUCTIONS.md` — safe process for updating an existing GitHub repository
+
 
 ## Protocol status & command discovery
 
