@@ -1,0 +1,804 @@
+##############################################################################
+#
+# F66 Ceiling Fan RF Lab
+#
+# Version : 4.1.0-LAB (Spare ESP32-S3 + CC1101)
+#
+# Platform : ESP32-S3 DevKitC-1 + CC1101
+#
+# RF Protocol :
+#   Literal replay of verified OEM F66 remote captures.
+#
+# Purpose :
+#   Isolated spare-unit RF development and validation.
+#   Production controller remains untouched.
+#
+##############################################################################
+
+esphome:
+  name: test-rf
+  friendly_name: TEST-RF
+
+  on_boot:
+    priority: -100
+    then:
+      - delay: 2s
+      - cc1101.reset:
+          id: radio
+      - cc1101.begin_rx:
+          id: radio
+      - text_sensor.template.publish:
+          id: rf_status
+          state: "READY - spare RF lab"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "TEST-RF-Fallback"
+    password: ""
+
+captive_portal:
+
+api:
+  batch_delay: 0ms
+
+ota:
+  - platform: esphome
+
+web_server:
+  port: 80
+
+logger:
+  level: INFO
+
+spi:
+  clk_pin: GPIO12
+  mosi_pin: GPIO11
+  miso_pin: GPIO13
+
+cc1101:
+  id: radio
+  cs_pin: GPIO10
+  frequency: 433.92MHz
+  output_power: 10
+  modulation_type: "ASK/OOK"
+  symbol_rate: 2400
+  filter_bandwidth: 200kHz
+
+remote_transmitter:
+  id: rf_tx
+  pin:
+    number: GPIO14
+    inverted: false
+  carrier_duty_percent: 100%
+  clock_resolution: 1000000
+  use_dma: true
+  rmt_symbols: 256
+  non_blocking: false
+  eot_level: false
+
+remote_receiver:
+  id: rf_rx
+  pin:
+    number: GPIO9
+    mode:
+      input: true
+      pullup: false
+  dump:
+    - raw
+  tolerance:
+    type: percentage
+    value: 35%
+  filter: 100us
+  idle: 10ms
+  buffer_size: 20kB
+  clock_resolution: 1000000
+  use_dma: true
+  rmt_symbols: 256
+  filter_symbols: 20
+
+# ---------------------------------------------------------------------------
+# Environmental sensor omitted from the spare RF lab firmware.
+# GPIO4 and GPIO5 remain available for future lab expansion.
+# ---------------------------------------------------------------------------
+
+globals:
+  - id: frequency_hz
+    type: float
+    restore_value: no
+    initial_value: "433920000.0f"
+
+  - id: symbol_rate_baud
+    type: float
+    restore_value: no
+    initial_value: "2400.0f"
+
+  - id: repeat_count
+    type: int
+    restore_value: no
+    initial_value: "4"
+
+  - id: tx_settle_us
+    type: int
+    restore_value: no
+    initial_value: "1000"
+
+text_sensor:
+  - platform: template
+    name: "RF Status"
+    id: rf_status
+    icon: "mdi:radio-tower"
+
+  - platform: template
+    name: "RF Transmission Profile"
+    id: rf_profile
+    icon: "mdi:tune-variant"
+
+binary_sensor:
+  - platform: status
+    name: "Controller Status"
+
+select:
+  - platform: template
+    name: "RF Frequency"
+    id: frequency_select
+    optimistic: true
+    restore_value: false
+    initial_option: "433.920 MHz"
+    options:
+      - "433.870 MHz"
+      - "433.920 MHz"
+      - "433.970 MHz"
+    set_action:
+      - lambda: |-
+          if (x == "433.870 MHz") id(frequency_hz) = 433870000.0f;
+          else if (x == "433.970 MHz") id(frequency_hz) = 433970000.0f;
+          else id(frequency_hz) = 433920000.0f;
+
+  - platform: template
+    name: "RF CC1101 Symbol Rate"
+    id: symbol_rate_select
+    optimistic: true
+    restore_value: false
+    initial_option: "2400 baud"
+    options:
+      - "600 baud"
+      - "1200 baud"
+      - "2400 baud"
+      - "4800 baud"
+    set_action:
+      - lambda: |-
+          if (x == "600 baud") id(symbol_rate_baud) = 600.0f;
+          else if (x == "1200 baud") id(symbol_rate_baud) = 1200.0f;
+          else if (x == "4800 baud") id(symbol_rate_baud) = 4800.0f;
+          else id(symbol_rate_baud) = 2400.0f;
+
+  - platform: template
+    name: "RF Repeat Count"
+    id: repeats_select
+    optimistic: true
+    restore_value: false
+    initial_option: "4"
+    options:
+      - "4"
+      - "8"
+      - "16"
+    set_action:
+      - lambda: id(repeat_count) = atoi(x.c_str());
+
+  - platform: template
+    name: "RF TX Settling"
+    id: settle_select
+    optimistic: true
+    restore_value: false
+    initial_option: "1000 us"
+    options:
+      - "0 us"
+      - "500 us"
+      - "1000 us"
+      - "2000 us"
+    set_action:
+      - lambda: |-
+          if (x == "0 us") id(tx_settle_us) = 0;
+          else if (x == "500 us") id(tx_settle_us) = 500;
+          else if (x == "2000 us") id(tx_settle_us) = 2000;
+          else id(tx_settle_us) = 1000;
+
+script:
+  - id: restore_recommended
+    mode: restart
+    then:
+      - lambda: |-
+          id(frequency_hz) = 433920000.0f;
+          id(symbol_rate_baud) = 2400.0f;
+          id(repeat_count) = 4;
+          id(tx_settle_us) = 1000;
+      - select.set:
+          id: frequency_select
+          option: "433.920 MHz"
+      - select.set:
+          id: symbol_rate_select
+          option: "2400 baud"
+      - select.set:
+          id: repeats_select
+          option: "4"
+      - select.set:
+          id: settle_select
+          option: "1000 us"
+      - text_sensor.template.publish:
+          id: rf_status
+          state: "Recommended literal profile restored"
+
+  - id: send_literal
+    mode: queued
+    max_runs: 10
+    parameters:
+      frame_id: int
+      command_name: string
+    then:
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("Sending: ") + command_name;
+      - lambda: |-
+          char text[180];
+          snprintf(text, sizeof(text),
+            "%s | literal frame %d | %.3fMHz | %.0f baud | x%d | settle %dus",
+            command_name.c_str(), frame_id,
+            id(frequency_hz) / 1000000.0f,
+            id(symbol_rate_baud),
+            id(repeat_count),
+            id(tx_settle_us));
+          ESP_LOGI("f66", "%s", text);
+          id(rf_profile).publish_state(text);
+      - cc1101.set_idle:
+          id: radio
+      - cc1101.set_frequency:
+          id: radio
+          value: !lambda return id(frequency_hz);
+      - cc1101.set_symbol_rate:
+          id: radio
+          value: !lambda return id(symbol_rate_baud);
+      - cc1101.set_output_power:
+          id: radio
+          value: 10
+      - cc1101.begin_tx:
+          id: radio
+      - lambda: delayMicroseconds(id(tx_settle_us));
+      - remote_transmitter.transmit_raw:
+          transmitter_id: rf_tx
+          carrier_frequency: 0Hz
+          code: !lambda |-
+            static const int32_t frame_0[60] = {
+              439, -1092, 363, -1112, 381, -1084, 383, -1104, 385, -1114,
+              1079, -412, 367, -1106, 1103, -386, 357, -1124, 1083, -386,
+              1107, -354, 383, -1112, 391, -1084, 1097, -392, 395, -1082,
+              1117, -350, 1107, -386, 1111, -390, 385, -1078, 1117, -380,
+              1085, -384, 1101, -384, 357, -1130, 385, -1114, 1077, -408,
+              365, -1108, 381, -1088, 383, -1102, 1105, -386, 1077, -5986
+            };
+            static const int32_t frame_1[60] = {
+              583, -1090, 377, -1110, 377, -1086, 381, -1102, 385, -1112,
+              1079, -408, 337, -1136, 1073, -420, 357, -1122, 1075, -386,
+              1111, -356, 385, -1112, 357, -1116, 1097, -392, 359, -1118,
+              1085, -384, 1105, -386, 1109, -392, 375, -1106, 1103, -386,
+              1077, -384, 385, -1110, 353, -1116, 381, -1116, 365, -1116,
+              1085, -384, 375, -1114, 1107, -368, 1117, -380, 1089, -5966
+            };
+            static const int32_t frame_2[60] = {
+              386, -1115, 365, -1119, 365, -1109, 373, -1110, 370, -1094,
+              1124, -363, 387, -1092, 1119, -366, 385, -1100, 1108, -386,
+              1102, -377, 370, -1117, 364, -1116, 1093, -389, 377, -1093,
+              1109, -378, 1097, -395, 1093, -364, 386, -1122, 1089, -372,
+              1106, -401, 1097, -371, 1097, -395, 1105, -377, 370, -1117,
+              1101, -390, 364, -1117, 369, -1111, 373, -1099, 391, -6681
+            };
+            static const int32_t frame_3[60] = {
+              391, -1124, 351, -1116, 381, -1108, 375, -1108, 379, -1088,
+              1111, -354, 385, -1108, 1119, -378, 367, -1104, 1105, -388,
+              1077, -386, 385, -1112, 353, -1114, 1099, -384, 375, -1114,
+              1103, -366, 1127, -358, 1121, -388, 357, -1084, 1111, -386,
+              1109, -390, 1101, -346, 1119, -384, 363, -1110, 385, -1118,
+              1109, -366, 383, -1114, 363, -1120, 381, -1086, 1097, -5978
+            };
+            static const int32_t frame_4[60] = {
+              481, -1074, 369, -1116, 365, -1112, 381, -1086, 383, -1106,
+              1105, -384, 359, -1104, 1115, -386, 357, -1104, 1107, -382,
+              1117, -364, 383, -1114, 365, -1116, 1087, -386, 373, -1118,
+              1071, -394, 1093, -382, 1121, -386, 357, -1122, 1075, -386,
+              1109, -388, 1101, -356, 399, -1086, 1107, -392, 375, -1114,
+              1107, -382, 347, -1128, 383, -1100, 1083, -404, 347, -6704
+            };
+            static const int32_t frame_5[60] = {
+              419, -1082, 381, -1078, 387, -1112, 389, -1088, 385, -1112,
+              1093, -382, 365, -1106, 1107, -390, 355, -1128, 1111, -354,
+              1111, -358, 405, -1104, 381, -1086, 1107, -356, 407, -1106,
+              1105, -388, 1073, -384, 1105, -378, 383, -1086, 1127, -356,
+              1127, -390, 1079, -382, 387, -1074, 385, -1118, 385, -1116,
+              1095, -384, 365, -1106, 385, -1086, 1137, -362, 1101, -5946
+            };
+            static const int32_t frame_6[60] = {
+              391, -1088, 385, -1084, 397, -1102, 363, -1114, 385, -1084,
+              1105, -394, 385, -1078, 1123, -380, 365, -1110, 1107, -388,
+              1079, -386, 385, -1114, 351, -1104, 1131, -350, 413, -1080,
+              1109, -366, 1125, -356, 1125, -354, 393, -1084, 1109, -384,
+              1097, -394, 385, -1082, 1123, -380, 1089, -386, 375, -1114,
+              1105, -370, 383, -1116, 1093, -382, 365, -1108, 383, -6672
+            };
+            static const int32_t frame_7[60] = {
+              400, -1102, 367, -1100, 384, -1098, 382, -1096, 390, -1094,
+              1123, -368, 373, -1100, 1119, -370, 394, -1103, 1085, -383,
+              1098, -380, 390, -1086, 386, -1097, 1116, -372, 383, -1092,
+              1115, -390, 1090, -369, 1129, -376, 370, -1092, 1110, -397,
+              1094, -384, 368, -1114, 1101, -381, 371, -1116, 370, -1123,
+              1095, -389, 378, -1096, 1100, -365, 389, -1115, 1092, -5976
+            };
+            static const int32_t frame_8[60] = {
+              400, -1110, 373, -1098, 390, -1090, 389, -1090, 369, -1124,
+              1097, -395, 368, -1107, 1101, -378, 372, -1116, 1088, -400,
+              1092, -384, 362, -1121, 367, -1099, 1110, -385, 374, -1110,
+              1082, -394, 1100, -390, 1095, -390, 380, -1096, 1098, -390,
+              1091, -395, 365, -1099, 380, -1122, 1093, -395, 362, -1126,
+              1098, -369, 392, -1089, 1114, -364, 1114, -367, 385, -6682
+            };
+            static const int32_t frame_9[60] = {
+              400, -1103, 366, -1101, 384, -1097, 396, -1098, 367, -1099,
+              1112, -385, 374, -1100, 1115, -364, 392, -1108, 1098, -369,
+              1116, -371, 367, -1102, 382, -1112, 1110, -370, 392, -1088,
+              1098, -385, 1102, -397, 1096, -366, 396, -1099, 1096, -397,
+              368, -1108, 1101, -381, 370, -1094, 383, -1115, 1119, -364,
+              390, -1108, 1103, -379, 369, -1093, 1117, -390, 1091, -5957
+            };
+            static const int32_t frame_10[60] = {
+              402, -1118, 369, -1118, 367, -1113, 362, -1099, 383, -1111,
+              1110, -375, 363, -1120, 1094, -390, 380, -1095, 1109, -369,
+              1118, -371, 366, -1103, 379, -1122, 1092, -394, 363, -1101,
+              1099, -392, 1092, -396, 1094, -371, 395, -1100, 1092, -392,
+              1112, -375, 363, -1115, 1087, -391, 381, -1098, 1106, -398,
+              369, -1119, 370, -1094, 1099, -384, 372, -1119, 1089, -5977
+            };
+            static const int32_t frame_11[60] = {
+              427, -1075, 391, -1112, 360, -1113, 364, -1113, 389, -1091,
+              1096, -385, 375, -1116, 1110, -376, 370, -1116, 1087, -391,
+              1090, -395, 363, -1100, 379, -1124, 1091, -394, 362, -1100,
+              1108, -395, 1094, -384, 1093, -366, 394, -1098, 1110, -372,
+              1109, -384, 1099, -395, 367, -1109, 1101, -379, 1098, -394,
+              367, -1111, 371, -1109, 373, -1117, 1085, -400, 368, -6679
+            };
+            static const int32_t frame_12[60] = {
+              400, -1079, 413, -1088, 391, -1090, 370, -1125, 368, -1092,
+              1115, -366, 389, -1093, 1123, -366, 397, -1099, 1094, -383,
+              1092, -387, 385, -1086, 393, -1108, 1100, -379, 369, -1118,
+              1090, -390, 1090, -397, 1092, -370, 382, -1099, 1114, -391,
+              1089, -369, 1127, -378, 1095, -370, 395, -1106, 1097, -383,
+              374, -1118, 361, -1121, 366, -1096, 388, -1099, 1105, -5959
+            };
+            static const int32_t frame_13[60] = {
+              427, -1070, 386, -1098, 381, -1116, 365, -1119, 366, -1109,
+              1099, -381, 371, -1118, 1090, -391, 365, -1117, 1092, -389,
+              1088, -392, 380, -1094, 382, -1091, 1114, -369, 387, -1098,
+              1106, -396, 1093, -383, 1085, -401, 368, -1117, 1088, -390,
+              365, -1116, 1091, -388, 1111, -369, 1112, -396, 1092, -390,
+              365, -1117, 1094, -367, 370, -1123, 371, -1119, 370, -6679
+            };
+            static const int32_t frame_14[60] = {
+              402, -1113, 373, -1100, 366, -1115, 368, -1113, 372, -1100,
+              1094, -395, 364, -1099, 1106, -395, 368, -1090, 1114, -365,
+              1116, -368, 382, -1096, 383, -1096, 1093, -392, 379, -1095,
+              1085, -392, 1091, -395, 1095, -373, 384, -1097, 1094, -391,
+              1086, -379, 388, -1091, 394, -1101, 1080, -407, 1087, -381,
+              374, -1116, 359, -1123, 1092, -368, 1114, -359, 383, -6696
+            };
+
+            const int32_t *frame = nullptr;
+            switch (frame_id) {
+              case 0: frame = frame_0; break;
+              case 1: frame = frame_1; break;
+              case 2: frame = frame_2; break;
+              case 3: frame = frame_3; break;
+              case 4: frame = frame_4; break;
+              case 5: frame = frame_5; break;
+              case 6: frame = frame_6; break;
+              case 7: frame = frame_7; break;
+              case 8: frame = frame_8; break;
+              case 9: frame = frame_9; break;
+              case 10: frame = frame_10; break;
+              case 11: frame = frame_11; break;
+              case 12: frame = frame_12; break;
+              case 13: frame = frame_13; break;
+              case 14: frame = frame_14; break;
+              default:
+                ESP_LOGE("f66", "Invalid literal frame id: %d", frame_id);
+                return std::vector<int32_t>{};
+            }
+
+            std::vector<int32_t> out;
+            out.reserve(id(repeat_count) * 60);
+            for (int repeat = 0; repeat < id(repeat_count); repeat++) {
+              out.insert(out.end(), frame, frame + 60);
+            }
+            return out;
+      - cc1101.set_idle:
+          id: radio
+      - cc1101.begin_rx:
+          id: radio
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("Complete: ") + command_name;
+
+
+  # Experimental packet generator.
+  # This exists alongside the proven literal replay controls.
+  - id: send_generated
+    mode: queued
+    max_runs: 10
+    parameters:
+      packet_bits: string
+      command_name: string
+    then:
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("Generated TX: ") + command_name;
+      - lambda: |-
+          ESP_LOGI("f66_lab", "Generated TX: %s | bits=%s",
+                   command_name.c_str(), packet_bits.c_str());
+      - cc1101.set_idle:
+          id: radio
+      - cc1101.set_frequency:
+          id: radio
+          value: !lambda return id(frequency_hz);
+      - cc1101.set_symbol_rate:
+          id: radio
+          value: !lambda return id(symbol_rate_baud);
+      - cc1101.set_output_power:
+          id: radio
+          value: 10
+      - cc1101.begin_tx:
+          id: radio
+      - lambda: delayMicroseconds(id(tx_settle_us));
+      - remote_transmitter.transmit_raw:
+          transmitter_id: rf_tx
+          carrier_frequency: 0Hz
+          code: !lambda |-
+            // The OEM frame contains 30 pulse symbols:
+            //   0 = +380 us, -1100 us
+            //   1 = +1100 us, -380 us
+            // The final symbol uses a ~6000 us inter-frame gap.
+            if (packet_bits.size() != 30) {
+              ESP_LOGE("f66_lab", "Packet must contain exactly 30 bits; got %u",
+                       static_cast<unsigned>(packet_bits.size()));
+              return std::vector<int32_t>{};
+            }
+
+            constexpr int32_t SHORT_US = 380;
+            constexpr int32_t LONG_US = 1100;
+            constexpr int32_t GAP_US = 6000;
+
+            std::vector<int32_t> one_frame;
+            one_frame.reserve(60);
+
+            for (size_t i = 0; i < packet_bits.size(); i++) {
+              const char bit = packet_bits[i];
+              if (bit == '0') {
+                one_frame.push_back(SHORT_US);
+                one_frame.push_back(i == packet_bits.size() - 1 ? -GAP_US : -LONG_US);
+              } else if (bit == '1') {
+                one_frame.push_back(LONG_US);
+                one_frame.push_back(i == packet_bits.size() - 1 ? -GAP_US : -SHORT_US);
+              } else {
+                ESP_LOGE("f66_lab", "Invalid packet character at position %u",
+                         static_cast<unsigned>(i));
+                return std::vector<int32_t>{};
+              }
+            }
+
+            std::vector<int32_t> output;
+            output.reserve(id(repeat_count) * one_frame.size());
+            for (int repeat = 0; repeat < id(repeat_count); repeat++) {
+              output.insert(output.end(), one_frame.begin(), one_frame.end());
+            }
+            return output;
+      - cc1101.set_idle:
+          id: radio
+      - cc1101.begin_rx:
+          id: radio
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("Generated complete: ") + command_name;
+
+button:
+  # -------------------------------------------------------------------------
+  # Generated protocol test suite. These buttons synthesize packets from
+  # decoded bits; the original literal-replay buttons remain below them.
+  # -------------------------------------------------------------------------
+  - platform: template
+    name: "LAB Generated Fan Off"
+    icon: "mdi:fan-off"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011100100010"
+          command_name: "Generated Fan Off"
+
+  - platform: template
+    name: "LAB Generated Breeze"
+    icon: "mdi:weather-windy"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011000010110"
+          command_name: "Generated Breeze"
+
+  - platform: template
+    name: "LAB Generated Speed 1"
+    icon: "mdi:fan-speed-1"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011111010000"
+          command_name: "Generated Speed 1"
+
+  - platform: template
+    name: "LAB Generated Speed 2"
+    icon: "mdi:fan-speed-2"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011110010000"
+          command_name: "Generated Speed 2"
+
+  - platform: template
+    name: "LAB Generated Speed 3"
+    icon: "mdi:fan-speed-3"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011101010010"
+          command_name: "Generated Speed 3"
+
+  - platform: template
+    name: "LAB Generated Speed 4"
+    icon: "mdi:fan"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011100010010"
+          command_name: "Generated Speed 4"
+
+  - platform: template
+    name: "LAB Generated Speed 5"
+    icon: "mdi:fan"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011011010100"
+          command_name: "Generated Speed 5"
+
+  - platform: template
+    name: "LAB Generated Speed 6"
+    icon: "mdi:fan"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011010010100"
+          command_name: "Generated Speed 6"
+
+  - platform: template
+    name: "LAB Generated Reverse"
+    icon: "mdi:swap-horizontal"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011001010110"
+          command_name: "Generated Reverse"
+
+  - platform: template
+    name: "LAB Generated Timer 1H"
+    icon: "mdi:timer-outline"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111010100101010"
+          command_name: "Generated Timer 1H"
+
+  - platform: template
+    name: "LAB Generated Timer 2H"
+    icon: "mdi:timer-outline"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011010100100"
+          command_name: "Generated Timer 2H"
+
+  - platform: template
+    name: "LAB Generated Timer 4H"
+    icon: "mdi:timer-outline"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011101100010"
+          command_name: "Generated Timer 4H"
+
+  - platform: template
+    name: "LAB Generated Timer 8H"
+    icon: "mdi:timer-outline"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011110100000"
+          command_name: "Generated Timer 8H"
+
+  - platform: template
+    name: "LAB Generated Light On"
+    icon: "mdi:lightbulb-on"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111010111101000"
+          command_name: "Generated Light On"
+
+  - platform: template
+    name: "LAB Generated Light Off"
+    icon: "mdi:lightbulb-off"
+    entity_category: diagnostic
+    on_press:
+      - script.execute:
+          id: send_generated
+          packet_bits: "000001010110010111011001100110"
+          command_name: "Generated Light Off"
+
+
+
+  - platform: template
+    name: "Power"
+    icon: "mdi:power"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 0
+          command_name: "Power"
+
+  - platform: template
+    name: "Fan"
+    icon: "mdi:fan"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 1
+          command_name: "Fan"
+
+  - platform: template
+    name: "Speed 1"
+    icon: "mdi:fan-speed-1"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 2
+          command_name: "Speed 1"
+
+  - platform: template
+    name: "Speed 2"
+    icon: "mdi:fan-speed-2"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 3
+          command_name: "Speed 2"
+
+  - platform: template
+    name: "Speed 3"
+    icon: "mdi:fan-speed-3"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 4
+          command_name: "Speed 3"
+
+  - platform: template
+    name: "Speed 4"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 5
+          command_name: "Speed 4"
+
+  - platform: template
+    name: "Speed 5"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 6
+          command_name: "Speed 5"
+
+  - platform: template
+    name: "Speed 6"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 7
+          command_name: "Speed 6"
+
+  - platform: template
+    name: "R/L"
+    icon: "mdi:swap-horizontal"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 8
+          command_name: "R/L"
+
+  - platform: template
+    name: "1H"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 9
+          command_name: "1H"
+
+  - platform: template
+    name: "2H"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 10
+          command_name: "2H"
+
+  - platform: template
+    name: "4H"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 11
+          command_name: "4H"
+
+  - platform: template
+    name: "8H"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 12
+          command_name: "8H"
+
+  - platform: template
+    name: "Light On"
+    icon: "mdi:lightbulb-on"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 13
+          command_name: "Light On"
+
+  - platform: template
+    name: "Light Off"
+    icon: "mdi:lightbulb-off"
+    on_press:
+      - script.execute:
+          id: send_literal
+          frame_id: 14
+          command_name: "Light Off"
+
+  - platform: restart
+    name: "Restart TEST-RF"

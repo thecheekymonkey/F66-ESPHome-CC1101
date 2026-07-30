@@ -1,0 +1,174 @@
+# F66 Home Assistant Mushroom dashboard — v1.0.0
+# All RF actions intentionally use stateless ESPHome button entities.
+type: vertical-stack
+cards:
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.bedroom_f66_ceiling_fan_controller_f66_temperature
+        name: Temperature
+        icon: mdi:thermometer
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: sensor.bedroom_f66_ceiling_fan_controller_f66_humidity
+        name: Humidity
+        icon: mdi:water-percent
+        layout: vertical
+      - type: custom:mushroom-entity-card
+        entity: sensor.bedroom_f66_ceiling_fan_controller_f66_gas_resistance
+        name: Gas quality
+        icon: mdi:air-filter
+        layout: vertical
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        primary: Light On
+        icon: mdi:lightbulb-on
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_light_on
+      - type: custom:mushroom-template-card
+        primary: Light Off
+        icon: mdi:lightbulb-off
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_light_off
+
+  - type: custom:mushroom-template-card
+    primary: Power Off
+    icon: mdi:fan-off
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.bedroom_f66_ceiling_fan_controller_f66_power_off
+
+  - type: grid
+    columns: 6
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        primary: "1"
+        icon: mdi:fan-speed-1
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_1
+      - type: custom:mushroom-template-card
+        primary: "2"
+        icon: mdi:fan-speed-2
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_2
+      - type: custom:mushroom-template-card
+        primary: "3"
+        icon: mdi:fan-speed-3
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_3
+      - type: custom:mushroom-template-card
+        primary: "4"
+        icon: mdi:fan
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_4
+      - type: custom:mushroom-template-card
+        primary: "5"
+        icon: mdi:fan
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_5
+      - type: custom:mushroom-template-card
+        primary: "6"
+        icon: mdi:fan
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_speed_6
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        primary: Breeze
+        icon: mdi:weather-windy
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_breeze
+      - type: custom:mushroom-template-card
+        primary: Reverse Direction
+        icon: mdi:swap-horizontal
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_reverse_direction
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-template-card
+        primary: 1 hour
+        icon: mdi:timer-outline
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_timer_1_hour
+      - type: custom:mushroom-template-card
+        primary: 2 hours
+        icon: mdi:timer-outline
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_timer_2_hours
+      - type: custom:mushroom-template-card
+        primary: 4 hours
+        icon: mdi:timer-outline
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_timer_4_hours
+      - type: custom:mushroom-template-card
+        primary: 8 hours
+        icon: mdi:timer-outline
+        layout: vertical
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.bedroom_f66_ceiling_fan_controller_f66_timer_8_hours

@@ -1,0 +1,667 @@
+##############################################################################
+#
+# F66 Ceiling Fan RF Lab
+#
+# Version : 8.2.0-PRODUCTION (all dashboard commands stateless)
+#
+# Platform : ESP32-S3 DevKitC-1 + CC1101 + BME680
+#
+# RF Protocol :
+#   Compact F66 packet builder: fixed 20-bit prefix + 9-bit command + even parity.
+#
+# Purpose :
+#   Production controller using the exact TEST-RF packet builder and entities.
+#
+##############################################################################
+
+esphome:
+  name: f66-ceiling-fan-controller
+  friendly_name: F66 Ceiling Fan Controller
+
+  on_boot:
+    priority: -100
+    then:
+      - delay: 2s
+      - cc1101.reset:
+          id: radio
+      - cc1101.set_idle:
+          id: radio
+      - text_sensor.template.publish:
+          id: rf_status
+          state: "READY - F66 packet builder + BME680"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Ceiling-Fan-Controller-Fallback"
+    password: ""
+
+captive_portal:
+
+api:
+  batch_delay: 0ms
+
+ota:
+  - platform: esphome
+
+web_server:
+  port: 80
+
+logger:
+  level: INFO
+
+spi:
+  clk_pin: GPIO12
+  mosi_pin: GPIO11
+  miso_pin: GPIO13
+
+cc1101:
+  id: radio
+  cs_pin: GPIO10
+  frequency: 433.92MHz
+  output_power: 10
+  modulation_type: "ASK/OOK"
+  symbol_rate: 2400
+  filter_bandwidth: 200kHz
+
+remote_transmitter:
+  id: rf_tx
+  pin:
+    number: GPIO14
+    inverted: false
+  carrier_duty_percent: 100%
+  clock_resolution: 1000000
+  use_dma: true
+  rmt_symbols: 256
+  non_blocking: false
+  eot_level: false
+
+# ---------------------------------------------------------------------------
+# BME680 environmental sensor attached to the TEST-RF rig
+# GPIO4 = SDA
+# GPIO5 = SCL
+# ---------------------------------------------------------------------------
+
+i2c:
+  id: environmental_i2c
+  sda: GPIO4
+  scl: GPIO5
+  frequency: 100kHz
+  scan: true
+
+sensor:
+  - platform: bme680
+    i2c_id: environmental_i2c
+    address: 0x77
+    update_interval: 10s
+
+    temperature:
+      name: "F66 Temperature"
+      icon: "mdi:thermometer"
+      oversampling: 16x
+
+    pressure:
+      name: "F66 Pressure"
+      icon: "mdi:gauge"
+      oversampling: 16x
+
+    humidity:
+      name: "F66 Humidity"
+      icon: "mdi:water-percent"
+      oversampling: 16x
+
+    gas_resistance:
+      name: "F66 Gas Resistance"
+      icon: "mdi:air-filter"
+
+
+globals:
+  - id: frequency_hz
+    type: float
+    restore_value: no
+    initial_value: "433920000.0f"
+
+  - id: symbol_rate_baud
+    type: float
+    restore_value: no
+    initial_value: "2400.0f"
+
+  - id: repeat_count
+    type: int
+    restore_value: no
+    initial_value: "4"
+
+  - id: tx_settle_us
+    type: int
+    restore_value: no
+    initial_value: "1000"
+
+text_sensor:
+  - platform: template
+    name: "F66 RF Status"
+    id: rf_status
+    icon: "mdi:radio-tower"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "F66 RF Transmission Profile"
+    id: rf_profile
+    icon: "mdi:tune-variant"
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: status
+    name: "F66 Controller Status"
+    entity_category: diagnostic
+
+select:
+  # Action-style selector. It returns to "Ready" after sending so the same
+  # timer can be selected again later.
+  - platform: template
+    name: "F66 Sleep Timer"
+    id: sleep_timer
+    icon: "mdi:timer-outline"
+    optimistic: false
+    restore_value: false
+    initial_option: "Ready"
+    options:
+      - "Ready"
+      - "1 hour"
+      - "2 hours"
+      - "4 hours"
+      - "8 hours"
+    set_action:
+      - if:
+          condition:
+            lambda: return x == "1 hour";
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 149
+                command_name: "Timer 1H"
+      - if:
+          condition:
+            lambda: return x == "2 hours";
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 338
+                command_name: "Timer 2H"
+      - if:
+          condition:
+            lambda: return x == "4 hours";
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 433
+                command_name: "Timer 4H"
+      - if:
+          condition:
+            lambda: return x == "8 hours";
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 464
+                command_name: "Timer 8H"
+      - delay: 250ms
+      - lambda: id(sleep_timer).publish_state("Ready");
+
+  - platform: template
+    name: "F66 RF Frequency"
+    entity_category: diagnostic
+    id: frequency_select
+    optimistic: true
+    restore_value: false
+    initial_option: "433.920 MHz"
+    options:
+      - "433.870 MHz"
+      - "433.920 MHz"
+      - "433.970 MHz"
+    set_action:
+      - lambda: |-
+          if (x == "433.870 MHz") id(frequency_hz) = 433870000.0f;
+          else if (x == "433.970 MHz") id(frequency_hz) = 433970000.0f;
+          else id(frequency_hz) = 433920000.0f;
+
+  - platform: template
+    name: "F66 RF CC1101 Symbol Rate"
+    entity_category: diagnostic
+    id: symbol_rate_select
+    optimistic: true
+    restore_value: false
+    initial_option: "2400 baud"
+    options:
+      - "600 baud"
+      - "1200 baud"
+      - "2400 baud"
+      - "4800 baud"
+    set_action:
+      - lambda: |-
+          if (x == "600 baud") id(symbol_rate_baud) = 600.0f;
+          else if (x == "1200 baud") id(symbol_rate_baud) = 1200.0f;
+          else if (x == "4800 baud") id(symbol_rate_baud) = 4800.0f;
+          else id(symbol_rate_baud) = 2400.0f;
+
+  - platform: template
+    name: "F66 RF Repeat Count"
+    entity_category: diagnostic
+    id: repeats_select
+    optimistic: true
+    restore_value: false
+    initial_option: "4"
+    options:
+      - "4"
+      - "8"
+      - "16"
+    set_action:
+      - lambda: id(repeat_count) = atoi(x.c_str());
+
+  - platform: template
+    name: "F66 RF TX Settling"
+    entity_category: diagnostic
+    id: settle_select
+    optimistic: true
+    restore_value: false
+    initial_option: "1000 us"
+    options:
+      - "0 us"
+      - "500 us"
+      - "1000 us"
+      - "2000 us"
+    set_action:
+      - lambda: |-
+          if (x == "0 us") id(tx_settle_us) = 0;
+          else if (x == "500 us") id(tx_settle_us) = 500;
+          else if (x == "2000 us") id(tx_settle_us) = 2000;
+          else id(tx_settle_us) = 1000;
+
+script:
+  - id: restore_recommended
+    mode: restart
+    then:
+      - lambda: |-
+          id(frequency_hz) = 433920000.0f;
+          id(symbol_rate_baud) = 2400.0f;
+          id(repeat_count) = 4;
+          id(tx_settle_us) = 1000;
+      - select.set:
+          id: frequency_select
+          option: "433.920 MHz"
+      - select.set:
+          id: symbol_rate_select
+          option: "2400 baud"
+      - select.set:
+          id: repeats_select
+          option: "4"
+      - select.set:
+          id: settle_select
+          option: "1000 us"
+      - text_sensor.template.publish:
+          id: rf_status
+          state: "Recommended generated profile restored"
+
+  # Compact F66 packet builder.
+  #
+  # Frame:
+  #   bits 0..19  = fixed receiver/address prefix
+  #   bits 20..28 = 9-bit command
+  #   bit 29      = even parity across the complete 30-bit frame
+  #
+  # Buttons pass only the command value; this script constructs the packet.
+  - id: send_f66
+    mode: queued
+    max_runs: 10
+    parameters:
+      command_code: int
+      command_name: string
+    then:
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("F66 TX: ") + command_name;
+
+      - lambda: |-
+          constexpr uint32_t PREFIX = 0b00000101011001011101;
+          const uint16_t command = static_cast<uint16_t>(command_code) & 0x01FF;
+
+          uint8_t ones = 0;
+          for (uint8_t i = 0; i < 20; i++) ones += (PREFIX >> i) & 1U;
+          for (uint8_t i = 0; i < 9; i++) ones += (command >> i) & 1U;
+          const uint8_t parity = ones & 1U;
+
+          std::string bits;
+          bits.reserve(30);
+          for (int i = 19; i >= 0; i--) bits.push_back(((PREFIX >> i) & 1U) ? '1' : '0');
+          for (int i = 8; i >= 0; i--) bits.push_back(((command >> i) & 1U) ? '1' : '0');
+          bits.push_back(parity ? '1' : '0');
+
+          ESP_LOGI(
+            "f66_lab",
+            "F66 TX: %s | command=0x%03X | parity=%u | bits=%s",
+            command_name.c_str(),
+            static_cast<unsigned>(command),
+            static_cast<unsigned>(parity),
+            bits.c_str()
+          );
+
+      - cc1101.set_idle:
+          id: radio
+      - cc1101.set_frequency:
+          id: radio
+          value: !lambda return id(frequency_hz);
+      - cc1101.set_symbol_rate:
+          id: radio
+          value: !lambda return id(symbol_rate_baud);
+      - cc1101.set_output_power:
+          id: radio
+          value: 10
+      - cc1101.begin_tx:
+          id: radio
+      - lambda: delayMicroseconds(id(tx_settle_us));
+
+      - remote_transmitter.transmit_raw:
+          transmitter_id: rf_tx
+          carrier_frequency: 0Hz
+          code: !lambda |-
+            constexpr uint32_t PREFIX = 0b00000101011001011101;
+            constexpr int32_t SHORT_US = 380;
+            constexpr int32_t LONG_US = 1100;
+            constexpr int32_t GAP_US = 6000;
+
+            const uint16_t command = static_cast<uint16_t>(command_code) & 0x01FF;
+
+            uint8_t ones = 0;
+            for (uint8_t i = 0; i < 20; i++) ones += (PREFIX >> i) & 1U;
+            for (uint8_t i = 0; i < 9; i++) ones += (command >> i) & 1U;
+            const uint8_t parity = ones & 1U;
+
+            std::vector<uint8_t> frame;
+            frame.reserve(30);
+
+            for (int i = 19; i >= 0; i--)
+              frame.push_back((PREFIX >> i) & 1U);
+
+            for (int i = 8; i >= 0; i--)
+              frame.push_back((command >> i) & 1U);
+
+            frame.push_back(parity);
+
+            std::vector<int32_t> one_frame;
+            one_frame.reserve(60);
+
+            for (size_t i = 0; i < frame.size(); i++) {
+              const bool bit = frame[i] != 0;
+              one_frame.push_back(bit ? LONG_US : SHORT_US);
+
+              const bool last_bit = i == frame.size() - 1;
+              one_frame.push_back(
+                last_bit ? -GAP_US : (bit ? -SHORT_US : -LONG_US)
+              );
+            }
+
+            std::vector<int32_t> output;
+            output.reserve(id(repeat_count) * one_frame.size());
+
+            for (int repeat = 0; repeat < id(repeat_count); repeat++)
+              output.insert(output.end(), one_frame.begin(), one_frame.end());
+
+            return output;
+
+      - cc1101.set_idle:
+          id: radio
+
+      - text_sensor.template.publish:
+          id: rf_status
+          state: !lambda |-
+            return std::string("F66 complete: ") + command_name;
+
+# ---------------------------------------------------------------------------
+# Native Home Assistant fan entity
+#
+# The receiver is one-way, so the state shown in Home Assistant is optimistic:
+# it reflects commands sent by TEST-RF. Use of the OEM remote can make it differ
+# from the fan's physical state.
+#
+# Direction remains a separate "Reverse Direction" button because the RF
+# command toggles direction; it does not set an absolute forward/reverse state.
+# ---------------------------------------------------------------------------
+
+fan:
+  - platform: template
+    name: "F66 Ceiling Fan"
+    id: ceiling_fan
+    icon: "mdi:ceiling-fan"
+    speed_count: 6
+    preset_modes:
+      - "Breeze"
+
+    on_turn_on:
+      - if:
+          condition:
+            lambda: return id(ceiling_fan).speed == 0;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 488
+                command_name: "Speed 1"
+
+    on_turn_off:
+      - script.execute:
+          id: send_f66
+          command_code: 401
+          command_name: "Fan Off"
+
+    on_speed_set:
+      - if:
+          condition:
+            lambda: return x == 1;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 488
+                command_name: "Speed 1"
+      - if:
+          condition:
+            lambda: return x == 2;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 456
+                command_name: "Speed 2"
+      - if:
+          condition:
+            lambda: return x == 3;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 425
+                command_name: "Speed 3"
+      - if:
+          condition:
+            lambda: return x == 4;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 393
+                command_name: "Speed 4"
+      - if:
+          condition:
+            lambda: return x == 5;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 362
+                command_name: "Speed 5"
+      - if:
+          condition:
+            lambda: return x == 6;
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 330
+                command_name: "Speed 6"
+
+    on_preset_set:
+      - if:
+          condition:
+            lambda: return x == "Breeze";
+          then:
+            - script.execute:
+                id: send_f66
+                command_code: 267
+                command_name: "Breeze"
+
+
+button:
+  # Dedicated stateless OFF action. This always transmits, even when the
+  # optimistic fan entity already believes the fan is off.
+  - platform: template
+    name: "F66 Power Off"
+    icon: "mdi:fan-off"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 401
+          command_name: "Fan Off"
+
+  # Dedicated speed buttons. Each press always transmits, including repeated
+  # presses of the same speed.
+  - platform: template
+    name: "F66 Speed 1"
+    icon: "mdi:fan-speed-1"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 488
+          command_name: "Speed 1"
+
+  - platform: template
+    name: "F66 Speed 2"
+    icon: "mdi:fan-speed-2"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 456
+          command_name: "Speed 2"
+
+  - platform: template
+    name: "F66 Speed 3"
+    icon: "mdi:fan-speed-3"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 425
+          command_name: "Speed 3"
+
+  - platform: template
+    name: "F66 Speed 4"
+    icon: "mdi:fan"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 393
+          command_name: "Speed 4"
+
+  - platform: template
+    name: "F66 Speed 5"
+    icon: "mdi:fan"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 362
+          command_name: "Speed 5"
+
+  - platform: template
+    name: "F66 Speed 6"
+    icon: "mdi:fan"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 330
+          command_name: "Speed 6"
+
+  - platform: template
+    name: "F66 Breeze"
+    icon: "mdi:weather-windy"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 267
+          command_name: "Breeze"
+
+  # Dedicated timer buttons avoid select-state suppression and always transmit.
+  - platform: template
+    name: "F66 Timer 1 Hour"
+    icon: "mdi:timer-outline"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 149
+          command_name: "Timer 1H"
+
+  - platform: template
+    name: "F66 Timer 2 Hours"
+    icon: "mdi:timer-outline"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 338
+          command_name: "Timer 2H"
+
+  - platform: template
+    name: "F66 Timer 4 Hours"
+    icon: "mdi:timer-outline"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 433
+          command_name: "Timer 4H"
+
+  - platform: template
+    name: "F66 Timer 8 Hours"
+    icon: "mdi:timer-outline"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 464
+          command_name: "Timer 8H"
+
+  # Separate light actions are intentional: the RF receiver does not report
+  # light state, so a toggle could become incorrect after using the OEM remote.
+  - platform: template
+    name: "F66 Light On"
+    icon: "mdi:lightbulb-on"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 244
+          command_name: "F66 Light On"
+
+  - platform: template
+    name: "F66 Light Off"
+    icon: "mdi:lightbulb-off"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 307
+          command_name: "F66 Light Off"
+
+  # This command toggles the physical direction; absolute direction is unknown.
+  - platform: template
+    name: "F66 Reverse Direction"
+    icon: "mdi:swap-horizontal"
+    on_press:
+      - script.execute:
+          id: send_f66
+          command_code: 299
+          command_name: "Reverse"
+
+  - platform: restart
+    name: "F66 Restart Controller"
+    entity_category: diagnostic
